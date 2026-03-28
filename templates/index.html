@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metro Doc Classifier</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0a0c0f;
+            --surface:   #111418;
+            --border:    #1e2329;
+            --border-hi: #2e3540;
+            --text:      #c8d0da;
+            --text-dim:  #505a68;
+            --text-bright: #eef1f5;
+            --accent:    #f5c518;
+            --accent-dim:#7a6209;
+            --green:     #22c55e;
+            --red:       #ef4444;
+            --orange:    #f97316;
+            --mono:      'Share Tech Mono', monospace;
+            --sans:      'Barlow Condensed', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Scanline overlay ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.07) 2px,
+                rgba(0,0,0,0.07) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* ── Header ── */
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 0 40px;
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            height: 64px;
+            position: relative;
+        }
+
+        .header-line {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), transparent 60%);
+        }
+
+        .logo-block {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding-right: 32px;
+            border-right: 1px solid var(--border);
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .logo-icon svg { display: block; }
+
+        .logo-text {
+            font-family: var(--sans);
+            font-weight: 900;
+            font-size: 18px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-bright);
+            line-height: 1;
+        }
+
+        .logo-sub {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        .header-meta {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            margin-left: auto;
+        }
+
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .meta-label {
+            font-family: var(--mono);
+            font-size: 9px;
+            color: var(--text-dim);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .meta-value {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        /* ── Layout ── */
+        main {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+
+        /* ── Section header ── */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .section-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: var(--accent);
+            text-transform: uppercase;
+            background: rgba(245,197,24,0.08);
+            border: 1px solid var(--accent-dim);
+            padding: 3px 8px;
+        }
+
+        .section-label {
+            font-family: var(--sans);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-bright);
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ── Upload zone ── */
+        .upload-zone {
+            border: 1px solid var(--border-hi);
+            background: var(--surface);
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            margin-bottom: 48px;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 24px; height: 24px;
+            border-top: 2px solid var(--accent);
+            border-left: 2px solid var(--accent);
+        }
+
+        .upload-zone::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 24px; height: 24px;
+            border-bottom: 2px solid var(--accent);
+            border-right: 2px solid var(--accent);
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(245,197,24,0.04);
+        }
+
+        .upload-zone input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            width: 56px;
+            height: 56px;
+            border: 1px solid var(--border-hi);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+            transition: transform 0.2s;
+        }
+
+        .upload-zone:hover .upload-icon {
+            transform: translateY(-3px);
+        }
+
+        .upload-main-text {
+            font-family: var(--sans);
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--text-bright);
+        }
+
+        .upload-sub-text {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .file-badge {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--accent);
+            background: rgba(245,197,24,0.1);
+            border: 1px solid var(--accent-dim);
+            padding: 4px 12px;
+            display: none;
+        }
+
+        .file-badge.visible { display: inline-block; }
+
+        /* ── Action row ── */
+        .action-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 8px;
+        }
+
+        .btn-primary {
+            font-family: var(--sans);
+            font-weight: 700;
+            font-size: 15px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #000;
+            background: var(--accent);
+            border: none;
+            padding: 12px 32px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary:hover { background: #ffd633; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled {
+            background: var(--border-hi);
+            color: var(--text-dim);
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            font-family: var(--mono);
+            font-size: 12px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            background: transparent;
+            border: 1px solid var(--border-hi);
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: color 0.15s, border-color 0.15s;
+        }
+
+        .btn-secondary:hover {
+            color: var(--text);
+            border-color: var(--text-dim);
+        }
+
+        .status-msg {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            margin-left: auto;
+        }
+
+        .status-msg.active { color: var(--accent); }
+        .status-msg.done   { color: var(--green); }
+        .status-msg.error  { color: var(--red); }
+
+        /* ── Queue panel ── */
+        .queue-panel {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            margin-bottom: 48px;
+            display: none;
+        }
+
+        .queue-panel.visible { display: block; }
+
+        .queue-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .queue-header-label {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+        }
+
+        .queue-counter {
+            font-family: var(--mono);
+            font-size: 11px;
+            color: var(--accent);
+        }
+
+        /* ── File row ── */
+        .file-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            animation: rowIn 0.3s ease forwards;
+        }
+
+        @keyframes rowIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        .file-row:last-child { border-bottom: none; }
+
+        .file-row-bg {
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 0%;
+            background: rgba(245,197,24,0.04);
+            transition: width 0.6s ease;
+            pointer-events: none;
+        }
+
+        .file-row-bg.done { background: rgba(34,197,94,0.05); width: 100% !important; }
+        .file-row-bg.error { background: rgba(239,68,68,0.05); width: 100% !important; }
+
+        .file-name {
+            font-family: var(--mono);
+            font-size: 13px;
+            color: var(--text-bright);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 380px;
+        }
+
+        .file-meta {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 3px;
+        }
+
+        .file-status-col {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .status-badge {
+            font-family: var(--mono);
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border: 1px solid;
+        }
+
+        .status-badge.queued   { color: var(--text-dim);   border-color: var(--border-hi); }
+        .status-badge.proc     { color: var(--accent);     border-color: var(--accent-dim); animation: pulse 1.2s ease-in-out infinite; }
+        .status-badge.done     { color: var(--green);      border-color: #14532d; }
+        .status-badge.error    { color: var(--red);        border-color: #7f1d1d; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .category-tag {
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-dim);
+            max-width: 280px;
+            text-align: right;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .confidence-chip {
+            font-family: var(--mono);
+            font-size: 10px;
+            padding: 1px 6px;
+            font-weight: bold;
+        }
+
+        .confidence-chip.high   { color: var(--green);  background: rgba(34,197,94,0.1); }
+        .confidence-chip.medium { color: var(--orange); background: rgba(249,115,22,0.1); }
+        .confidence-chip.low    { color: var(--red);    background: rgba(239,68,68,0.1); }
+
+        /* ── Summary table ── */
+        .summary-panel {
+            border: 1px solid var(--border);
+            background: var(--surface);
+            display: none;
+        }
+
+        .summary-panel.visible { display: block; }
+
+        .summary-header {
+            display: grid;
+            grid-template-columns: 2fr 3fr 1fr;
+            gap: 0;
+            border-bottom: 2px solid var(--accent-dim);
+        }
+
+        .summary-th {
+            font-family: var(--mono);
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.02);
+            border-right: 1px solid var(--border);
+        }
+
+        .summary-th:last-child { border-right: none; }
+
+        .summary-row {
+            display: grid;
+            grid-template-columns: 2fr 3fr 1fr;
+            border-bottom: 1px solid var(--border);
+            animation: rowIn 0.4s ease forwards;
+        }
+
+        .summary-row:last-child { border-bottom: none; }
+
+        .summary-cell {
+            padding: 14px 20px;
+            border-right: 1px solid var(--border);
+            font-family: var(--sans);
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-bright);
+            letter-spacing: 0.02em;
+        }
+
+        .summary-cell:last-child { border-right: none; }
+
+        .summary-cell.files {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: normal;
+            color: var(--text-dim);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .summary-cell.count {
+            font-family: var(--mono);
+            font-size: 24px;
+            font-weight: normal;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* ── Category pill color accent ── */
+        .cat-dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo-block">
+        <div class="logo-icon">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="2" y="2" width="7" height="7" fill="#000"/>
+                <rect x="11" y="2" width="7" height="7" fill="#000"/>
+                <rect x="2" y="11" width="7" height="7" fill="#000"/>
+                <rect x="11" y="11" width="7" height="3" fill="#000"/>
+                <rect x="15" y="15" width="3" height="3" fill="#000"/>
+            </svg>
+        </div>
+        <div>
+            <div class="logo-text">Metro Doc Classifier</div>
+            <div class="logo-sub">BERT · 6-class · v1.0</div>
+        </div>
+    </div>
+    <div class="header-meta">
+        <div class="meta-item">
+            <span class="meta-label">System</span>
+            <span class="meta-value" id="headerStatus">READY</span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">Processed</span>
+            <span class="meta-value" id="headerCount">0</span>
+        </div>
+    </div>
+    <div class="header-line"></div>
+</header>
+
+<main>
+
+    <!-- Upload -->
+    <div class="section-title">
+        <span class="section-tag">01</span>
+        <span class="section-label">Ingest Documents</span>
+        <div class="section-line"></div>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+        <input type="file" id="pdfFileInput" name="pdfFiles" accept=".pdf" multiple>
+        <div class="upload-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <div class="upload-main-text">Drop PDF files here</div>
+        <div class="upload-sub-text">or click to browse · multiple files supported</div>
+        <span class="file-badge" id="fileBadge">No files selected</span>
+    </div>
+
+    <div class="action-row">
+        <button class="btn-primary" id="classifyBtn" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            Classify
+        </button>
+        <button class="btn-secondary" id="resetBtn">Clear</button>
+        <span class="status-msg" id="statusMsg">— Select files to begin</span>
+    </div>
+
+    <!-- Queue -->
+    <div style="margin-top:40px;">
+        <div class="section-title">
+            <span class="section-tag">02</span>
+            <span class="section-label">Processing Queue</span>
+            <div class="section-line"></div>
+        </div>
+        <div class="queue-panel" id="queuePanel">
+            <div class="queue-header">
+                <span class="queue-header-label">File · Status · Classification</span>
+                <span class="queue-counter" id="queueCounter">0 / 0</span>
+            </div>
+            <div id="fileList"></div>
+        </div>
+    </div>
+
+    <!-- Summary -->
+    <div style="margin-top:40px;">
+        <div class="section-title">
+            <span class="section-tag">03</span>
+            <span class="section-label">Category Summary</span>
+            <div class="section-line"></div>
+        </div>
+        <div class="summary-panel" id="summaryPanel">
+            <div class="summary-header">
+                <div class="summary-th">Category</div>
+                <div class="summary-th">Files</div>
+                <div class="summary-th" style="text-align:center;">Count</div>
+            </div>
+            <div id="summaryBody"></div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    const uploadZone   = document.getElementById('uploadZone');
+    const fileInput    = document.getElementById('pdfFileInput');
+    const fileBadge    = document.getElementById('fileBadge');
+    const classifyBtn  = document.getElementById('classifyBtn');
+    const resetBtn     = document.getElementById('resetBtn');
+    const statusMsg    = document.getElementById('statusMsg');
+    const queuePanel   = document.getElementById('queuePanel');
+    const fileList     = document.getElementById('fileList');
+    const queueCounter = document.getElementById('queueCounter');
+    const summaryPanel = document.getElementById('summaryPanel');
+    const summaryBody  = document.getElementById('summaryBody');
+    const headerStatus = document.getElementById('headerStatus');
+    const headerCount  = document.getElementById('headerCount');
+
+    let allFileStatuses = {};
+    let intervalId = null;
+    let totalProcessed = 0;
+
+    const CAT_COLORS = [
+        '#f5c518','#22c55e','#3b82f6','#a855f7','#f97316','#06b6d4'
+    ];
+
+    // ── Drag & Drop
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        const dt = e.dataTransfer;
+        if (dt.files.length) {
+            // filter PDFs
+            const pdfs = Array.from(dt.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            updateFileSelection(pdfs);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        updateFileSelection(Array.from(fileInput.files));
+    });
+
+    function updateFileSelection(files) {
+        if (!files.length) return;
+        fileBadge.classList.add('visible');
+        fileBadge.textContent = files.length === 1 ? files[0].name : `${files.length} PDF files selected`;
+        classifyBtn.disabled = false;
+        setStatus(`${files.length} file(s) ready`, 'active');
+    }
+
+    function setStatus(msg, type='') {
+        statusMsg.textContent = msg;
+        statusMsg.className = 'status-msg ' + type;
+    }
+
+    // ── Reset
+    resetBtn.addEventListener('click', () => {
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+        fileInput.value = '';
+        fileBadge.classList.remove('visible');
+        fileBadge.textContent = 'No files selected';
+        classifyBtn.disabled = true;
+        fileList.innerHTML = '';
+        summaryBody.innerHTML = '';
+        queuePanel.classList.remove('visible');
+        summaryPanel.classList.remove('visible');
+        allFileStatuses = {};
+        queueCounter.textContent = '0 / 0';
+        setStatus('— Select files to begin', '');
+        headerStatus.textContent = 'READY';
+    });
+
+    // ── Submit
+    classifyBtn.addEventListener('click', async () => {
+        const files = fileInput.files;
+        if (!files.length) return;
+
+        allFileStatuses = {};
+        fileList.innerHTML = '';
+        summaryBody.innerHTML = '';
+        summaryPanel.classList.remove('visible');
+        queuePanel.classList.add('visible');
+        classifyBtn.disabled = true;
+        headerStatus.textContent = 'ACTIVE';
+
+        const formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+            formData.append('pdfFiles', files[i]);
+            appendFileRow(files[i].name);
+        }
+
+        queueCounter.textContent = `0 / ${files.length}`;
+        setStatus('Uploading…', 'active');
+
+        try {
+            const res = await fetch('/upload-multiple-pdfs', { method: 'POST', body: formData });
+            const result = await res.json();
+            if (res.ok) {
+                setStatus(result.message, 'active');
+                if (intervalId) clearInterval(intervalId);
+                intervalId = setInterval(checkStatus, 900);
+            } else {
+                setStatus(result.error || 'Upload failed', 'error');
+                classifyBtn.disabled = false;
+            }
+        } catch (err) {
+            setStatus('Network error', 'error');
+            classifyBtn.disabled = false;
+        }
+    });
+
+    function appendFileRow(name) {
+        const row = document.createElement('div');
+        row.className = 'file-row';
+        row.id = 'row-' + CSS.escape(name);
+        row.innerHTML = `
+            <div class="file-row-bg" id="bg-${escId(name)}"></div>
+            <div>
+                <div class="file-name">${name}</div>
+                <div class="file-meta">PDF · awaiting classification</div>
+            </div>
+            <div class="file-status-col">
+                <span class="status-badge queued" id="badge-${escId(name)}">Queued</span>
+            </div>
+        `;
+        fileList.appendChild(row);
+    }
+
+    function escId(name) {
+        return name.replace(/[^a-zA-Z0-9]/g, '_');
+    }
+
+    async function checkStatus() {
+        try {
+            const res = await fetch('/file-status');
+            if (!res.ok) return;
+            const statuses = await res.json();
+
+            let done = 0, total = Object.keys(statuses).length;
+
+            for (const [name, info] of Object.entries(statuses)) {
+                const id = escId(name);
+                const badge = document.getElementById('badge-' + id);
+                const bg    = document.getElementById('bg-' + id);
+                const row   = document.getElementById('row-' + CSS.escape(name)) || document.querySelector(`[id="row-${id}"]`);
+                if (!badge) continue;
+
+                if (info.status === 'Processing') {
+                    badge.className = 'status-badge proc';
+                    badge.textContent = 'Processing';
+                } else if (info.status === 'Completed') {
+                    done++;
+                    allFileStatuses[name] = info;
+                    if (badge.className !== 'status-badge done') {
+                        badge.className = 'status-badge done';
+                        badge.textContent = 'Done';
+                        if (bg) { bg.classList.add('done'); }
+
+                        const confVal = parseFloat(info.confidence);
+                        const confClass = confVal > 90 ? 'high' : confVal >= 80 ? 'medium' : 'low';
+
+                        const col = badge.closest('.file-status-col') || badge.parentElement;
+                        const catTag = document.createElement('span');
+                        catTag.className = 'category-tag';
+                        catTag.textContent = info.category;
+                        const chip = document.createElement('span');
+                        chip.className = `confidence-chip ${confClass}`;
+                        chip.textContent = info.confidence;
+                        col.appendChild(catTag);
+                        col.appendChild(chip);
+
+                        // update meta
+                        const meta = badge.closest('.file-row')?.querySelector('.file-meta');
+                        if (meta) meta.textContent = 'PDF · classified';
+                    }
+                } else if (info.status === 'Error') {
+                    badge.className = 'status-badge error';
+                    badge.textContent = 'Error';
+                    if (bg) bg.classList.add('error');
+                }
+            }
+
+            queueCounter.textContent = `${done} / ${total}`;
+            totalProcessed = done;
+            headerCount.textContent = done;
+
+            if (done === total && total > 0) {
+                clearInterval(intervalId);
+                setStatus(`All ${total} file(s) classified`, 'done');
+                headerStatus.textContent = 'IDLE';
+                classifyBtn.disabled = false;
+                buildSummary(allFileStatuses);
+                summaryPanel.classList.add('visible');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function buildSummary(statuses) {
+        summaryBody.innerHTML = '';
+        const groups = {};
+        for (const [name, info] of Object.entries(statuses)) {
+            if (info.status === 'Completed') {
+                if (!groups[info.category]) groups[info.category] = [];
+                groups[info.category].push(name);
+            }
+        }
+
+        const cats = Object.keys(groups);
+        cats.forEach((cat, i) => {
+            const color = CAT_COLORS[i % CAT_COLORS.length];
+            const row = document.createElement('div');
+            row.className = 'summary-row';
+            row.style.animationDelay = (i * 0.06) + 's';
+            row.style.opacity = '0';
+            row.innerHTML = `
+                <div class="summary-cell">
+                    <span class="cat-dot" style="background:${color}"></span>${cat}
+                </div>
+                <div class="summary-cell files">
+                    ${groups[cat].map(f => `<span>${f}</span>`).join('')}
+                </div>
+                <div class="summary-cell count">${groups[cat].length}</div>
+            `;
+            summaryBody.appendChild(row);
+            // trigger animation
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => { row.style.opacity = ''; });
+            });
+        });
+    }
+
+    // ── Clock
+    function updateClock() {
+        // not needed but could add a live clock in header if desired
+    }
+</script>
+</body>
+</html>
