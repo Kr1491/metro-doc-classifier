@@ -105,7 +105,7 @@ The model was fine-tuned on a custom metro railway document dataset using `bert-
 - Fine-tuning loop with evaluation
 - Saving the model in HuggingFace format (`save_pretrained`)
 
-The trained model is hosted on HuggingFace Hub at [`YOUR_USERNAME/metro-bert-classifier`](https://huggingface.co/YOUR_USERNAME/metro-bert-classifier).
+The trained model is hosted on HuggingFace Hub at [`Kr1491/metro-bert-classifier`](https://huggingface.co/Kr1491/metro-bert-classifier).
 
 ---
 
