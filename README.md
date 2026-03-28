@@ -29,7 +29,7 @@ The model classifies documents into six categories:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/metro-doc-classifier.git
+git clone https://github.com/Kr1491/metro-doc-classifier.git
 cd metro-doc-classifier
 ```
 
