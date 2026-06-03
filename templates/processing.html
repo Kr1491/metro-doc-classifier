@@ -41,7 +41,7 @@ async function refreshQueue() {
     }
 }
 refreshQueue();
-const processingInterval = setInterval(refreshQueue, 1200);
-window.addEventListener('beforeunload', () => clearInterval(processingInterval));
+const processingIntervalId = setInterval(refreshQueue, 1200);
+window.addEventListener('beforeunload', () => clearInterval(processingIntervalId));
 </script>
 {% endblock %}

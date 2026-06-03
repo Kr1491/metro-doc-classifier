@@ -46,7 +46,7 @@ async function loadDashboardMetrics() {
     }
 }
 loadDashboardMetrics();
-const dashboardInterval = setInterval(loadDashboardMetrics, 2000);
-window.addEventListener('beforeunload', () => clearInterval(dashboardInterval));
+const dashboardIntervalId = setInterval(loadDashboardMetrics, 2000);
+window.addEventListener('beforeunload', () => clearInterval(dashboardIntervalId));
 </script>
 {% endblock %}

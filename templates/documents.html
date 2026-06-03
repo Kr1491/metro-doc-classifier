@@ -41,7 +41,7 @@ async function refreshLibrary() {
     }
 }
 refreshLibrary();
-const documentsInterval = setInterval(refreshLibrary, 3000);
-window.addEventListener('beforeunload', () => clearInterval(documentsInterval));
+const documentsIntervalId = setInterval(refreshLibrary, 3000);
+window.addEventListener('beforeunload', () => clearInterval(documentsIntervalId));
 </script>
 {% endblock %}
