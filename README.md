@@ -84,6 +84,19 @@ Frontend polls /file-status every 900ms → updates UI live
 
 ---
 
+## 🧭 Dashboard Navigation
+
+The app now uses a multi-page dashboard layout with sidebar navigation:
+
+- `/dashboard` — overview and queue stats
+- `/upload` — drag and drop PDF upload
+- `/processing` — live queue monitor
+- `/validation` — uncertain document review queue
+- `/documents` — document library
+- `/export` — CSV export page
+
+---
+
 ## 🚀 Deployment Notes
 
 - For production, replace `app.run(debug=True)` with a WSGI server like **Gunicorn**:

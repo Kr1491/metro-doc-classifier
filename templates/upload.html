@@ -1,0 +1,80 @@
+{% extends "index.html" %}
+
+{% block title %}Upload · Metro Doc Classifier{% endblock %}
+
+{% block page_styles %}
+<style>
+.upload-zone {
+    border: 1px dashed var(--accent-dim);
+    padding: 24px;
+    background: var(--surface);
+    cursor: pointer;
+}
+.upload-zone.dragover { border-color: var(--accent); background: rgba(245, 197, 24, 0.08); }
+.upload-actions { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
+.status { color: var(--text-dim); }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2 class="section-title">Upload Documents</h2>
+<div class="panel">
+    <div id="uploadZone" class="upload-zone">
+        <input type="file" id="pdfFileInput" name="pdfFiles" accept=".pdf" multiple style="display:none;">
+        <strong>Drop PDF files here</strong>
+        <div class="muted">or click to browse</div>
+    </div>
+    <div class="upload-actions">
+        <button class="btn" id="classifyBtn" disabled>Start Upload</button>
+        <span class="status" id="statusMsg">No files selected</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('pdfFileInput');
+const classifyBtn = document.getElementById('classifyBtn');
+const statusMsg = document.getElementById('statusMsg');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (files.length) {
+        const dataTransfer = new DataTransfer();
+        files.forEach(f => dataTransfer.items.add(f));
+        fileInput.files = dataTransfer.files;
+        statusMsg.textContent = `${files.length} file(s) selected`;
+        classifyBtn.disabled = false;
+    }
+});
+fileInput.addEventListener('change', () => {
+    if (!fileInput.files.length) return;
+    statusMsg.textContent = `${fileInput.files.length} file(s) selected`;
+    classifyBtn.disabled = false;
+});
+
+classifyBtn.addEventListener('click', async () => {
+    const files = fileInput.files;
+    if (!files.length) return;
+    const formData = new FormData();
+    for (const f of files) formData.append('pdfFiles', f);
+    statusMsg.textContent = 'Uploading files...';
+    classifyBtn.disabled = true;
+    try {
+        const res = await fetch('/upload-multiple-pdfs', { method: 'POST', body: formData });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Upload failed');
+        statusMsg.textContent = result.message;
+    } catch (e) {
+        statusMsg.textContent = e.message;
+        classifyBtn.disabled = false;
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "index.html" %}
+
+{% block title %}Documents · Metro Doc Classifier{% endblock %}
+
+{% block content %}
+<h2 class="section-title">Document Library</h2>
+<div class="panel">
+    <table class="table">
+        <thead>
+            <tr><th>Filename</th><th>Status</th><th>Category</th><th>Updated</th></tr>
+        </thead>
+        <tbody id="documentRows">
+            <tr><td colspan="4" class="muted">No documents found.</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+async function refreshLibrary() {
+    const res = await fetch('/file-status');
+    if (!res.ok) return;
+    const statuses = await res.json();
+    const rows = document.getElementById('documentRows');
+    const items = Object.entries(statuses);
+    if (!items.length) {
+        rows.innerHTML = '<tr><td colspan="4" class="muted">No documents found.</td></tr>';
+        return;
+    }
+    rows.innerHTML = items.map(([name, info]) =>
+        `<tr><td>${name}</td><td>${info.status || '-'}</td><td>${info.category || '-'}</td><td>${info.timestamp || '-'}</td></tr>`
+    ).join('');
+}
+refreshLibrary();
+setInterval(refreshLibrary, 3000);
+</script>
+{% endblock %}

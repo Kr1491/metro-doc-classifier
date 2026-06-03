@@ -1,0 +1,38 @@
+{% extends "index.html" %}
+
+{% block title %}Processing · Metro Doc Classifier{% endblock %}
+
+{% block content %}
+<h2 class="section-title">Live Queue Monitor</h2>
+<div class="panel">
+    <table class="table">
+        <thead>
+            <tr><th>Filename</th><th>Status</th><th>Category</th><th>Confidence</th></tr>
+        </thead>
+        <tbody id="queueRows">
+            <tr><td colspan="4" class="muted">Waiting for queue data...</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+async function refreshQueue() {
+    const res = await fetch('/file-status');
+    if (!res.ok) return;
+    const statuses = await res.json();
+    const rows = document.getElementById('queueRows');
+    const items = Object.entries(statuses);
+    if (!items.length) {
+        rows.innerHTML = '<tr><td colspan="4" class="muted">No files in queue.</td></tr>';
+        return;
+    }
+    rows.innerHTML = items.map(([name, info]) =>
+        `<tr><td>${name}</td><td>${info.status || '-'}</td><td>${info.category || '-'}</td><td>${info.confidence || '-'}</td></tr>`
+    ).join('');
+}
+refreshQueue();
+setInterval(refreshQueue, 1200);
+</script>
+{% endblock %}

@@ -1,6 +1,7 @@
 import os
+import csv
 import fitz
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for, Response
 import io
 import threading
 import queue
@@ -170,7 +171,37 @@ processing_thread.start()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
+
+
+@app.route('/upload')
+def upload():
+    return render_template('upload.html')
+
+
+@app.route('/processing')
+def processing():
+    return render_template('processing.html')
+
+
+@app.route('/validation')
+def validation():
+    return render_template('validation.html')
+
+
+@app.route('/documents')
+def documents():
+    return render_template('documents.html')
+
+
+@app.route('/export')
+def export():
+    return render_template('export.html')
 
 @app.route('/upload-multiple-pdfs', methods=['POST'])
 def upload_multiple_pdfs():
@@ -196,6 +227,30 @@ def upload_multiple_pdfs():
 @app.route('/file-status')
 def get_file_status():
     return jsonify(get_file_status_map())
+
+
+@app.route('/export/download')
+def export_download():
+    statuses = get_file_status_map()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['filename', 'status', 'category', 'confidence', 'timestamp', 'file_size'])
+
+    for filename, info in statuses.items():
+        writer.writerow([
+            filename,
+            info.get('status'),
+            info.get('category'),
+            info.get('confidence'),
+            info.get('timestamp'),
+            info.get('file_size')
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=classification_results.csv'}
+    )
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_HOST', '127.0.0.1')
