@@ -92,7 +92,7 @@ Frontend polls /file-status every 900ms → updates UI live
   ```
   Use `-w 1` (single worker) to avoid multiple instances of the background thread.
 
-- The `file_status` dict is **in-memory only** — it resets on restart. For persistence, swap it with a SQLite DB or Redis.
+- Classification results are persisted in a local SQLite database (`documents.db`) so status history survives app restarts.
 
 ---
 

@@ -5,6 +5,7 @@ import io
 import threading
 import queue
 import time
+import sqlite3
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import warnings
@@ -20,8 +21,59 @@ if not os.path.exists(UPLOAD_FOLDER):
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 file_queue = queue.Queue()
-file_status = {}
 processing_thread = None
+DB_PATH = os.path.join(os.path.dirname(__file__), 'documents.db')
+db_lock = threading.Lock()
+
+
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS documents (
+                filename TEXT PRIMARY KEY,
+                category TEXT,
+                confidence REAL,
+                timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                status TEXT NOT NULL,
+                file_size INTEGER
+            )
+        ''')
+
+
+def upsert_file_status(filename, status, category=None, confidence=None, file_size=None):
+    with db_lock:
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            conn.execute('''
+                INSERT INTO documents (filename, category, confidence, timestamp, status, file_size)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+                ON CONFLICT(filename) DO UPDATE SET
+                    category = excluded.category,
+                    confidence = excluded.confidence,
+                    timestamp = CURRENT_TIMESTAMP,
+                    status = excluded.status,
+                    file_size = COALESCE(excluded.file_size, documents.file_size)
+            ''', (filename, category, confidence, status, file_size))
+
+
+def get_file_status_map():
+    with db_lock:
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            rows = conn.execute('''
+                SELECT filename, category, confidence, timestamp, status, file_size
+                FROM documents
+                ORDER BY timestamp DESC
+            ''').fetchall()
+
+    statuses = {}
+    for filename, category, confidence, timestamp, status, file_size in rows:
+        statuses[filename] = {
+            'status': status,
+            'category': category,
+            'confidence': f"{confidence:.2f}%" if confidence is not None else None,
+            'timestamp': timestamp,
+            'file_size': file_size
+        }
+    return statuses
 
 # --- Load the Trained BERT Model ---
 MODEL_PATH = 'Kr1491/metro-bert-classifier'
@@ -67,10 +119,11 @@ def categorize_document_with_bert(text_content):
 
 def process_file_queue():
     while True:
+        filename = None
         try:
             filename, file_data = file_queue.get()
             
-            file_status[filename]['status'] = 'Processing'
+            upsert_file_status(filename, 'Processing')
             print(f"Processing file: {filename}")
             
             doc = fitz.open(stream=file_data, filetype="pdf")
@@ -90,20 +143,19 @@ def process_file_queue():
                 f.write(file_data)
             
             # Update the status with both category and confidence
-            file_status[filename]['status'] = 'Completed'
-            file_status[filename]['category'] = category
-            file_status[filename]['confidence'] = f"{confidence:.2f}%"
+            upsert_file_status(filename, 'Completed', category=category, confidence=confidence)
             
             print(f"Successfully processed and categorized: {filename} -> {category} (Confidence: {confidence:.2f}%)")
             file_queue.task_done()
             time.sleep(1)
 
         except Exception as e:
-            if filename in file_status:
-                file_status[filename]['status'] = 'Error'
+            if filename:
+                upsert_file_status(filename, 'Error')
             print(f"Error processing file: {filename}, Error: {e}")
             file_queue.task_done()
 
+init_db()
 processing_thread = threading.Thread(target=process_file_queue, daemon=True)
 processing_thread.start()
 
@@ -127,14 +179,14 @@ def upload_multiple_pdfs():
     for file in files:
         if file.filename:
             file_data = file.read()
-            file_status[file.filename] = {'status': 'Queued', 'category': None, 'confidence': None}
+            upsert_file_status(file.filename, 'Queued', file_size=len(file_data))
             file_queue.put((file.filename, file_data))
     
     return jsonify({"message": f"{len(files)} file(s) added to the queue for processing."}), 200
 
 @app.route('/file-status')
 def get_file_status():
-    return jsonify(file_status)
+    return jsonify(get_file_status_map())
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_HOST', '127.0.0.1')
