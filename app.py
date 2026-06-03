@@ -27,17 +27,18 @@ db_lock = threading.Lock()
 
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS documents (
-                filename TEXT PRIMARY KEY,
-                category TEXT,
-                confidence REAL,
-                timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                status TEXT NOT NULL,
-                file_size INTEGER
-            )
-        ''')
+    with db_lock:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS documents (
+                    filename TEXT PRIMARY KEY,
+                    category TEXT,
+                    confidence REAL,
+                    timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT NOT NULL,
+                    file_size INTEGER
+                )
+            ''')
 
 
 def upsert_file_status(filename, status, category=None, confidence=None, file_size=None):
@@ -51,7 +52,7 @@ def upsert_file_status(filename, status, category=None, confidence=None, file_si
                     confidence = excluded.confidence,
                     timestamp = CURRENT_TIMESTAMP,
                     status = excluded.status,
-                    file_size = COALESCE(excluded.file_size, documents.file_size)
+                    file_size = excluded.file_size
             ''', (filename, category, confidence, status, file_size))
 
 
@@ -120,10 +121,12 @@ def categorize_document_with_bert(text_content):
 def process_file_queue():
     while True:
         filename = None
+        file_size = None
         try:
             filename, file_data = file_queue.get()
+            file_size = len(file_data)
             
-            upsert_file_status(filename, 'Processing')
+            upsert_file_status(filename, 'Processing', file_size=file_size)
             print(f"Processing file: {filename}")
             
             doc = fitz.open(stream=file_data, filetype="pdf")
@@ -143,7 +146,13 @@ def process_file_queue():
                 f.write(file_data)
             
             # Update the status with both category and confidence
-            upsert_file_status(filename, 'Completed', category=category, confidence=confidence)
+            upsert_file_status(
+                filename,
+                'Completed',
+                category=category,
+                confidence=confidence,
+                file_size=file_size
+            )
             
             print(f"Successfully processed and categorized: {filename} -> {category} (Confidence: {confidence:.2f}%)")
             file_queue.task_done()
@@ -151,7 +160,7 @@ def process_file_queue():
 
         except Exception as e:
             if filename:
-                upsert_file_status(filename, 'Error')
+                upsert_file_status(filename, 'Error', file_size=file_size)
             print(f"Error processing file: {filename}, Error: {e}")
             file_queue.task_done()
 
