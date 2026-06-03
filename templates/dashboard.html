@@ -1,0 +1,40 @@
+{% extends "index.html" %}
+
+{% block title %}Dashboard · Metro Doc Classifier{% endblock %}
+
+{% block content %}
+<h2 class="section-title">Dashboard Overview</h2>
+<div class="grid">
+    <div class="panel">
+        <div class="metric-label">Queue Status</div>
+        <div class="metric-value" id="metricQueued">0</div>
+    </div>
+    <div class="panel">
+        <div class="metric-label">Completed</div>
+        <div class="metric-value" id="metricCompleted">0</div>
+    </div>
+    <div class="panel">
+        <div class="metric-label">Errors</div>
+        <div class="metric-value" id="metricError">0</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+async function loadDashboardMetrics() {
+    const res = await fetch('/file-status');
+    if (!res.ok) return;
+    const statuses = await res.json();
+    const values = Object.values(statuses);
+    const queued = values.filter(v => v.status === 'Queued' || v.status === 'Processing').length;
+    const completed = values.filter(v => v.status === 'Completed').length;
+    const errors = values.filter(v => v.status === 'Error').length;
+    document.getElementById('metricQueued').textContent = queued;
+    document.getElementById('metricCompleted').textContent = completed;
+    document.getElementById('metricError').textContent = errors;
+}
+loadDashboardMetrics();
+setInterval(loadDashboardMetrics, 2000);
+</script>
+{% endblock %}
