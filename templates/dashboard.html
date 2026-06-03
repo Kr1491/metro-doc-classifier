@@ -18,14 +18,19 @@
         <div class="metric-value" id="metricError">0</div>
     </div>
 </div>
+<p class="muted" id="dashboardStatus"></p>
 {% endblock %}
 
 {% block page_scripts %}
 <script>
 async function loadDashboardMetrics() {
+    const statusEl = document.getElementById('dashboardStatus');
     try {
         const res = await fetch('/file-status');
-        if (!res.ok) return;
+        if (!res.ok) {
+            statusEl.textContent = 'Unable to load dashboard stats right now.';
+            return;
+        }
         const statuses = await res.json();
         const values = Object.values(statuses);
         const queued = values.filter(v => v.status === 'Queued' || v.status === 'Processing').length;
@@ -34,7 +39,9 @@ async function loadDashboardMetrics() {
         document.getElementById('metricQueued').textContent = queued;
         document.getElementById('metricCompleted').textContent = completed;
         document.getElementById('metricError').textContent = errors;
+        statusEl.textContent = '';
     } catch (err) {
+        statusEl.textContent = 'Unable to load dashboard stats right now.';
         console.error('Unable to refresh dashboard metrics', err);
     }
 }
