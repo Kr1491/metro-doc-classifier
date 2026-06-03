@@ -13,6 +13,7 @@
 .upload-zone.dragover { border-color: var(--accent); background: rgba(245, 197, 24, 0.08); }
 .upload-actions { margin-top: 10px; display: flex; gap: 10px; align-items: center; }
 .status { color: var(--text-dim); }
+.hidden-input { display: none; }
 </style>
 {% endblock %}
 
@@ -20,7 +21,7 @@
 <h2 class="section-title">Upload Documents</h2>
 <div class="panel">
     <div id="uploadZone" class="upload-zone">
-        <input type="file" id="pdfFileInput" name="pdfFiles" accept=".pdf" multiple style="display:none;">
+        <input type="file" id="pdfFileInput" name="pdfFiles" accept=".pdf" multiple class="hidden-input">
         <strong>Drop PDF files here</strong>
         <div class="muted">or click to browse</div>
     </div>
@@ -68,7 +69,7 @@ classifyBtn.addEventListener('click', async () => {
     classifyBtn.disabled = true;
     try {
         const res = await fetch('/upload-multiple-pdfs', { method: 'POST', body: formData });
-        const result = await res.json();
+        const result = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(result.error || 'Upload failed');
         statusMsg.textContent = result.message;
     } catch (e) {

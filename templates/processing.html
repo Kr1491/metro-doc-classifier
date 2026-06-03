@@ -19,20 +19,25 @@
 {% block page_scripts %}
 <script>
 async function refreshQueue() {
-    const res = await fetch('/file-status');
-    if (!res.ok) return;
-    const statuses = await res.json();
-    const rows = document.getElementById('queueRows');
-    const items = Object.entries(statuses);
-    if (!items.length) {
-        rows.innerHTML = '<tr><td colspan="4" class="muted">No files in queue.</td></tr>';
-        return;
+    try {
+        const res = await fetch('/file-status');
+        if (!res.ok) return;
+        const statuses = await res.json();
+        const rows = document.getElementById('queueRows');
+        const items = Object.entries(statuses);
+        if (!items.length) {
+            rows.innerHTML = '<tr><td colspan="4" class="muted">No files in queue.</td></tr>';
+            return;
+        }
+        rows.innerHTML = items.map(([name, info]) =>
+            `<tr><td>${name}</td><td>${info.status || '-'}</td><td>${info.category || '-'}</td><td>${info.confidence || '-'}</td></tr>`
+        ).join('');
+    } catch (err) {
+        console.error('Unable to refresh processing queue', err);
     }
-    rows.innerHTML = items.map(([name, info]) =>
-        `<tr><td>${name}</td><td>${info.status || '-'}</td><td>${info.category || '-'}</td><td>${info.confidence || '-'}</td></tr>`
-    ).join('');
 }
 refreshQueue();
-setInterval(refreshQueue, 1200);
+const processingInterval = setInterval(refreshQueue, 1200);
+window.addEventListener('beforeunload', () => clearInterval(processingInterval));
 </script>
 {% endblock %}
